@@ -15,6 +15,14 @@
 2. 打开示例场景 `Assets/ComfyUIBridgeDemo/Scenes` 下的场景。
 3. 运行 Demo，按脚本中的地址配置连接你的 ComfyUI 服务（默认本地 `http://127.0.0.1:8188`）。
 
+### 如何导入 API 文档到 Apifox
+
+工程内置了 ComfyUI 的 OpenAPI 接口文档 `Assets/ComfyUIBridgeDemo/Art/ComfyUI API接口文档.openapi.json`，可一键导入 Apifox 查看与调试所有接口：
+
+1. 打开 Apifox，点击「导入项目」按钮。
+3. 选择「OpenAPI / Swagger」格式，上传或拖入 `ComfyUI API接口文档.openapi.json`。
+4. 确认导入，Apifox 会自动生成所有接口分组、请求参数与示例，即可在线调试。
+
 ## 加入交流
 
 欢迎加入「新媒体交互」微信群，一起交流 Unity × ComfyUI / AI 交互玩法：
