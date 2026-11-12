@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ComfyUI Unity Bridge 控制面板（UI 原型预览 / Unity 数据文件）</title>
+<style>
+    /* ── 预览外壳：只为浏览器服务，Unity 完全忽略，请勿修改 ────── */
+    html, body { margin: 0; padding: 0; background: #0a0a0a; }
+    body {
+        font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── 约束堆叠：与 Unity 端求解规则一一对应 ─────────────────── */
+    [data-u-type] { box-sizing: border-box; }
+    [data-u-layout="v"] { display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; justify-content: flex-start; }
+    [data-u-layout="h"] { display: flex; flex-direction: row;    flex-wrap: nowrap; align-items: stretch; justify-content: flex-start; }
+    /* 缺省尺寸与 Unity 一致：纵向容器子节点默认高 40，横向容器子节点默认宽 100 */
+    [data-u-layout="v"] > * { flex: 0 0 auto; height: 40px; }
+    [data-u-layout="h"] > * { flex: 0 0 auto; width: 100px; }
+
+    /* ── 控件外观：Unity 端由 UGUI 组件渲染，此处用 CSS 模拟 ───── */
+    text, image { display: block; }
+    /* 垂直居中与 Unity 端 TMP 的默认 Middle 对齐保持一致 */
+    [data-u-type="text"]     { display: flex; align-items: center; white-space: pre-wrap; line-height: 1.2; overflow: hidden; }
+    [data-u-type="image"]    { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.07) 0 8px, rgba(0,0,0,0) 8px 16px); }
+    [data-u-type="button"]   { display: block; border: 0; padding: 0; font-family: inherit; cursor: pointer; }
+    [data-u-type="input"]    { display: block; border: 1px solid rgba(255,255,255,.18); padding: 0 12px; font-family: inherit; }
+    [data-u-type="dropdown"] { display: block; border: 1px solid rgba(255,255,255,.18); padding: 0 8px; font-family: inherit; }
+    [data-u-type="input"]::placeholder { color: rgba(255,255,255,.35); }
+
+    [data-u-type="toggle"]   { display: flex; align-items: center; }
+    [data-u-type="toggle"]::before {
+        content: ""; width: 1.05em; height: 1.05em; border-radius: 999px;
+        background: currentColor; margin-right: .5em; flex: 0 0 auto;
+    }
+    [data-u-type="toggle"][data-u-checked="false"]::before {
+        background: rgba(0,0,0,0); box-shadow: inset 0 0 0 2px currentColor;
+    }
+
+    [data-u-type="radio"]    { display: flex; align-items: center; }
+    [data-u-type="radio"]::before {
+        content: ""; width: .9em; height: .9em; border-radius: 999px;
+        box-shadow: inset 0 0 0 2px currentColor; margin-right: .5em; flex: 0 0 auto;
+    }
+    [data-u-type="radio"][data-u-checked="true"]::before { background: currentColor; }
+
+    [data-u-type="slider"]   { position: relative; border-radius: 999px; overflow: hidden; }
+    [data-u-type="slider"]::before {
+        content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+        width: var(--u-val, 50%); background: currentColor;
+    }
+    [data-u-type="slider"]::after {
+        content: ""; position: absolute; top: 0; bottom: 0; left: var(--u-val, 50%);
+        width: 4px; margin-left: -2px; background: #fff; opacity: .9;
+    }
+
+    [data-u-type="scroll"]   { position: relative; overflow: auto; border: 1px dashed rgba(255,255,255,.22); }
+    [data-u-type="scroll"]::before {
+        content: "滚动区域 ScrollView"; position: absolute; inset: 0;
+        display: flex; align-items: center; justify-content: center;
+        color: rgba(255,255,255,.28); font-size: 20px;
+    }
+
+</style>
+</head>
+<body>
+
+<div id="u-stage">
+
+<!-- ▼▼▼ 界面本体 ▼▼▼ -->
+<div data-u-type="div" data-u-name="ComfyUIBridgePanel" data-u-layout="v" style="width: 1920px; height: 1080px; background-color: #f5f5f7; color: #1d1d1f;">
+
+  <!-- ============ 顶部导航栏 ============ -->
+  <div data-u-type="div" data-u-name="TopNavBar" data-u-layout="h" data-u-pad="19" style="height: 76px; background-color: #ffffff; border-bottom: 1px solid #d2d2d7;">
+
+    <div data-u-type="div" data-u-name="TopLeftSpacer" style="width: 21px; height: 37px; background-color: transparent;"></div>
+
+    <div data-u-type="div" data-u-name="LogoGroup" data-u-layout="h" data-u-gap="14" style="width: 440px; height: 37px; background-color: transparent;">
+      <div data-u-type="image" data-u-name="AppLogoImage" style="width: 34px; height: 34px; background-color: #0071e3; background-image: none; border-radius: 9px;"></div>
+      <span data-u-type="text" data-u-name="AppTitleText" style="width: 392px; height: 37px; color: #1d1d1f; font-size: 24px; font-weight: 600; letter-spacing: 0.5px;">ComfyUI Unity Bridge 控制面板</span>
+    </div>
+
+    <div data-u-type="div" data-u-name="TopMidSpacer" style="width: 956px; height: 37px; background-color: transparent;"></div>
+
+    <div data-u-type="div" data-u-name="TopStatusGroup" data-u-layout="h" data-u-gap="28" style="width: 444px; height: 37px; background-color: transparent;">
+      <div data-u-type="div" data-u-name="HttpStatusRow" data-u-layout="h" data-u-gap="4" style="width: 90px; height: 37px; background-color: transparent;">
+        <span data-u-type="text" data-u-name="HttpPrefixText" style="width: 40px; height: 37px; color: #3c3c40; font-size: 15px;">HTTP</span>
+        <span data-u-type="text" data-u-name="HttpStateText" style="width: 46px; height: 37px; color: #ff3b30; font-size: 15px;">未连接</span>
+      </div>
+      <div data-u-type="div" data-u-name="WsStatusRow" data-u-layout="h" data-u-gap="4" style="width: 90px; height: 37px; background-color: transparent;">
+        <span data-u-type="text" data-u-name="WsPrefixText" style="width: 24px; height: 37px; color: #3c3c40; font-size: 15px;">WS</span>
+        <span data-u-type="text" data-u-name="WsStateText" style="width: 62px; height: 37px; color: #ff3b30; font-size: 15px;">未连接</span>
+      </div>
+      <button data-u-type="button" data-u-name="ConnectionTestButton" style="width: 110px; height: 37px; background-color: #0071e3; color: #ffffff; font-size: 15px; font-weight: 500; border: none; border-radius: 19px;">连接测试</button>
+      <button data-u-type="button" data-u-name="DisconnectButton" style="width: 70px; height: 37px; background-color: #e8e8ed; color: #1d1d1f; font-size: 15px; font-weight: 500; border: none; border-radius: 19px;">断开</button>
+    </div>
+
+    <div data-u-type="div" data-u-name="TopRightSpacer" style="width: 21px; height: 37px; background-color: transparent;"></div>
+  </div>
+
+  <!-- ============ 主体内容区 ============ -->
+  <div data-u-type="div" data-u-name="MainContentArea" data-u-layout="h" data-u-pad="24" data-u-gap="24" style="height: 1004px; background-color: #f5f5f7;">
+
+    <!-- ---------- 左栏 ---------- -->
+    <div data-u-type="div" data-u-name="LeftPanel" data-u-layout="v" data-u-gap="24" style="width: 380px; height: 956px; background-color: transparent;">
+
+      <div data-u-type="div" data-u-name="ConnectionBox" data-u-layout="v" data-u-pad="24" data-u-gap="14" style="height: 321px; background-color: #ffffff; border: 1px solid #e5e5ea; border-radius: 18px;">
+        <span data-u-type="text" data-u-name="ConnectionTitleText" style="height: 26px; color: #1d1d1f; font-size: 20px; font-weight: 600;">连接设置</span>
+        <span data-u-type="text" data-u-name="HttpLabelText" style="height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">HTTP 地址</span>
+        <input data-u-type="input" data-u-name="HttpAddressInput" value="http://127.0.0.1:8188" placeholder="http://127.0.0.1:8188" style="height: 42px; background-color: #f5f5f7; border: 1px solid #d2d2d7; color: #1d1d1f; font-size: 14px; border-radius: 10px;" />
+        <span data-u-type="text" data-u-name="WsLabelText" style="height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">WebSocket 地址</span>
+        <input data-u-type="input" data-u-name="WsAddressInput" value="ws://127.0.0.1:8188/ws?clientId=unity-bridge" placeholder="ws://127.0.0.1:8188/ws?clientId=xxx" style="height: 42px; background-color: #f5f5f7; border: 1px solid #d2d2d7; color: #1d1d1f; font-size: 14px; border-radius: 10px;" />
+        <div data-u-type="div" data-u-name="ConnectionStatusRow" data-u-layout="h" data-u-gap="4" style="height: 20px; background-color: transparent;">
+          <span data-u-type="text" data-u-name="ConnectionStatusLabelText" style="width: 90px; height: 20px; color: #3c3c40; font-size: 14px;">连接状态:</span>
+          <span data-u-type="text" data-u-name="ConnectionStatusValueText" style="width: 60px; height: 20px; color: #ff3b30; font-size: 14px;">未连接</span>
+        </div>
+        <span data-u-type="text" data-u-name="SystemInfoText" style="height: 21px; color: #4a4a4f; font-size: 13px; line-height: 1.6;">系统信息: 等待连接测试...</span>
+      </div>
+
+      <div data-u-type="div" data-u-name="EmbeddingsBox" data-u-layout="v" data-u-pad="24" data-u-gap="14" style="height: 284px; background-color: #ffffff; border: 1px solid #e5e5ea; border-radius: 18px;">
+        <div data-u-type="div" data-u-name="EmbeddingsHeader" data-u-layout="h" style="height: 30px; background-color: transparent;">
+          <span data-u-type="text" data-u-name="EmbeddingsTitleText" style="width: 240px; height: 30px; color: #1d1d1f; font-size: 20px; font-weight: 600;">Embeddings 列表</span>
+          <div data-u-type="div" data-u-name="EmbeddingsHeaderSpacer" style="width: 30px; height: 30px; background-color: transparent;"></div>
+          <button data-u-type="button" data-u-name="RefreshEmbeddingsButton" style="width: 60px; height: 30px; background-color: #0071e3; color: #ffffff; font-size: 13px; border: none; border-radius: 15px;">刷新</button>
+        </div>
+        <div data-u-type="scroll" data-u-name="EmbeddingsScroll" data-u-dir="v" data-u-layout="v" data-u-pad="10" data-u-gap="8" style="height: 190px; background-color: #f5f5f7; border: none; border-radius: 12px;">
+          <div data-u-type="div" data-u-name="EmbeddingItemTemplate" data-u-layout="h" data-u-pad="11" style="height: 48px; background-color: #ffffff; border-radius: 9px;">
+            <span data-u-type="text" data-u-name="EmbeddingTemplateNameText" style="width: 210px; height: 26px; color: #1d1d1f; font-size: 14px;">EasyNegative</span>
+            <div data-u-type="div" data-u-name="EmbeddingTemplateSpacer" style="width: 18px; height: 26px; background-color: transparent;"></div>
+            <button data-u-type="button" data-u-name="UseEmbeddingButton" style="width: 60px; height: 26px; background-color: #e8e8ed; color: #1d1d1f; font-size: 12px; border: none; border-radius: 13px;">使用</button>
+          </div>
+          <div data-u-type="div" data-u-name="EmbeddingItem" data-u-layout="h" data-u-pad="11" style="height: 48px; background-color: #ffffff; border-radius: 9px;">
+            <span data-u-type="text" data-u-name="EmbeddingItemNameText" style="width: 210px; height: 26px; color: #1d1d1f; font-size: 14px;">bad-hands-5</span>
+            <div data-u-type="div" data-u-name="EmbeddingItemSpacer" style="width: 18px; height: 26px; background-color: transparent;"></div>
+            <button data-u-type="button" data-u-name="UseEmbeddingActionButton" style="width: 60px; height: 26px; background-color: #e8e8ed; color: #1d1d1f; font-size: 12px; border: none; border-radius: 13px;">使用</button>
+          </div>
+        </div>
+      </div>
+
+      <div data-u-type="div" data-u-name="UploadBox" data-u-layout="v" data-u-pad="24" data-u-gap="14" style="height: 224px; background-color: #ffffff; border: 1px solid #e5e5ea; border-radius: 18px;">
+        <span data-u-type="text" data-u-name="UploadTitleText" style="height: 26px; color: #1d1d1f; font-size: 20px; font-weight: 600;">图片上传</span>
+        <input data-u-type="input" data-u-name="ImageFileInput" type="file" accept="image/*" style="height: 42px; background-color: #f5f5f7; border: 1px dashed #c7c7cc; color: #4a4a4f; font-size: 13px; border-radius: 10px;" />
+        <button data-u-type="button" data-u-name="UploadImageButton" style="height: 46px; background-color: #0071e3; color: #ffffff; font-size: 15px; font-weight: 500; border: none; border-radius: 12px;">上传到 ComfyUI</button>
+        <span data-u-type="text" data-u-name="UploadStatusText" style="height: 18px; color: #4a4a4f; font-size: 13px; word-break: break-all;">上传状态: 尚未选择文件</span>
+      </div>
+
+    </div>
+
+    <!-- ---------- 中栏 ---------- -->
+    <div data-u-type="div" data-u-name="CenterPanel" data-u-layout="v" data-u-gap="24" style="width: 984px; height: 956px; background-color: transparent;">
+
+      <div data-u-type="div" data-u-name="PublishTaskBox" data-u-layout="v" data-u-pad="24" data-u-gap="14" style="height: 607px; background-color: #ffffff; border: 1px solid #e5e5ea; border-radius: 18px;">
+        <span data-u-type="text" data-u-name="PublishTitleText" style="height: 26px; color: #1d1d1f; font-size: 20px; font-weight: 600;">发布绘图任务</span>
+
+        <div data-u-type="div" data-u-name="WorkflowRow" data-u-layout="h" data-u-gap="16" style="height: 69px; background-color: transparent;">
+          <div data-u-type="div" data-u-name="WorkflowGroup" data-u-layout="v" data-u-gap="7" style="width: 459px; height: 69px; background-color: transparent;">
+            <span data-u-type="text" data-u-name="WorkflowLabelText" style="height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">工作流 JSON</span>
+            <select data-u-type="dropdown" data-u-name="WorkflowDropdown" style="height: 44px; background-color: #f5f5f7; border: 1px solid #d2d2d7; color: #1d1d1f; font-size: 14px; border-radius: 10px;">
+              <option value="基础文生图.json">基础文生图.json</option>
+              <option value="基础图生图.json">基础图生图.json</option>
+              <option value="实时绘画.json">实时绘画.json</option>
+              <option value="ControlNet.json">ControlNet.json</option>
+              <option value="ControlNet LineArt.json">ControlNet LineArt.json</option>
+            </select>
+          </div>
+          <div data-u-type="div" data-u-name="CheckpointGroup" data-u-layout="v" data-u-gap="7" style="width: 459px; height: 69px; background-color: transparent;">
+            <span data-u-type="text" data-u-name="CheckpointLabelText" style="height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">Checkpoint 模型</span>
+            <span data-u-type="text" data-u-name="CheckpointValueText" data-u-pad="14" style="height: 44px; background-color: #f5f5f7; border: 1px solid #e5e5ea; color: #1d1d1f; font-size: 14px; border-radius: 10px; word-break: break-all;">primemix_v21.safetensors</span>
+          </div>
+        </div>
+
+        <span data-u-type="text" data-u-name="PromptLabelText" style="height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">正向提示词 (Prompt)</span>
+        <input data-u-type="input" data-u-name="PromptInput" placeholder="输入正向提示词, 例: 1girl, cat ears, blue dress, masterpiece" style="height: 46px; background-color: #f5f5f7; border: 1px solid #d2d2d7; color: #1d1d1f; font-size: 14px; border-radius: 10px;" />
+
+        <span data-u-type="text" data-u-name="NegativePromptLabelText" style="height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">反向提示词 (Negative)</span>
+        <input data-u-type="input" data-u-name="NegativePromptInput" value="text, watermark, lowres, bad anatomy" placeholder="输入反向提示词" style="height: 46px; background-color: #f5f5f7; border: 1px solid #d2d2d7; color: #1d1d1f; font-size: 14px; border-radius: 10px;" />
+
+        <div data-u-type="div" data-u-name="TaskNumberRow" data-u-layout="h" data-u-gap="16" style="height: 69px; background-color: transparent;">
+          <div data-u-type="div" data-u-name="WidthGroup" data-u-layout="v" data-u-gap="7" style="width: 222px; height: 69px; background-color: transparent;">
+            <span data-u-type="text" data-u-name="WidthLabelText" style="height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">宽度</span>
+            <input data-u-type="input" data-u-name="WidthInput" value="512" style="height: 44px; background-color: #f5f5f7; border: 1px solid #d2d2d7; color: #1d1d1f; font-size: 14px; border-radius: 10px;" />
+          </div>
+          <div data-u-type="div" data-u-name="HeightGroup" data-u-layout="v" data-u-gap="7" style="width: 222px; height: 69px; background-color: transparent;">
+            <span data-u-type="text" data-u-name="HeightLabelText" style="height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">高度</span>
+            <input data-u-type="input" data-u-name="HeightInput" value="512" style="height: 44px; background-color: #f5f5f7; border: 1px solid #d2d2d7; color: #1d1d1f; font-size: 14px; border-radius: 10px;" />
+          </div>
+          <div data-u-type="div" data-u-name="SeedGroup" data-u-layout="v" data-u-gap="7" style="width: 221px; height: 69px; background-color: transparent;">
+            <span data-u-type="text" data-u-name="SeedLabelText" style="height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">随机种子 (-1 随机)</span>
+            <input data-u-type="input" data-u-name="SeedInput" value="-1" style="height: 44px; background-color: #f5f5f7; border: 1px solid #d2d2d7; color: #1d1d1f; font-size: 14px; border-radius: 10px;" />
+          </div>
+          <div data-u-type="div" data-u-name="StepsGroup" data-u-layout="v" data-u-gap="7" style="width: 221px; height: 69px; background-color: transparent;">
+            <span data-u-type="text" data-u-name="StepsLabelText" style="height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">采样步数</span>
+            <input data-u-type="input" data-u-name="StepsInput" value="20" style="height: 44px; background-color: #f5f5f7; border: 1px solid #d2d2d7; color: #1d1d1f; font-size: 14px; border-radius: 10px;" />
+          </div>
+        </div>
+
+        <div data-u-type="div" data-u-name="TaskParamRow" data-u-layout="h" data-u-gap="16" style="height: 69px; background-color: transparent;">
+          <div data-u-type="div" data-u-name="CfgGroup" data-u-layout="v" data-u-gap="7" style="width: 193px; height: 69px; background-color: transparent;">
+            <span data-u-type="text" data-u-name="CfgLabelText" style="height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">CFG 提示词引导强度</span>
+            <input data-u-type="input" data-u-name="CfgInput" value="8.0" style="height: 44px; background-color: #f5f5f7; border: 1px solid #d2d2d7; color: #1d1d1f; font-size: 14px; border-radius: 10px;" />
+          </div>
+          <div data-u-type="div" data-u-name="SamplerGroup" data-u-layout="v" data-u-gap="7" style="width: 270px; height: 69px; background-color: transparent;">
+            <span data-u-type="text" data-u-name="SamplerLabelText" style="height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">采样器名称</span>
+            <select data-u-type="dropdown" data-u-name="SamplerDropdown" style="height: 44px; background-color: #f5f5f7; border: 1px solid #d2d2d7; color: #1d1d1f; font-size: 14px; border-radius: 10px;">
+              <option value="euler">euler</option>
+              <option value="euler_ancestral">euler_ancestral</option>
+              <option value="heun">heun</option>
+              <option value="dpmpp_2m">dpmpp_2m</option>
+              <option value="dpmpp_2m_sde_gpu">dpmpp_2m_sde_gpu</option>
+              <option value="dpmpp_3m_sde">dpmpp_3m_sde</option>
+              <option value="ddim">ddim</option>
+              <option value="lcm">lcm</option>
+              <option value="uni_pc">uni_pc</option>
+              <option value="res_multistep">res_multistep</option>
+            </select>
+          </div>
+          <div data-u-type="div" data-u-name="SchedulerGroup" data-u-layout="v" data-u-gap="7" style="width: 231px; height: 69px; background-color: transparent;">
+            <span data-u-type="text" data-u-name="SchedulerLabelText" style="height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">调度器</span>
+            <select data-u-type="dropdown" data-u-name="SchedulerDropdown" style="height: 44px; background-color: #f5f5f7; border: 1px solid #d2d2d7; color: #1d1d1f; font-size: 14px; border-radius: 10px;">
+              <option value="normal">normal</option>
+              <option value="simple">simple</option>
+              <option value="karras">karras</option>
+              <option value="exponential">exponential</option>
+              <option value="sgm_uniform">sgm_uniform</option>
+              <option value="beta">beta</option>
+              <option value="ddim_uniform">ddim_uniform</option>
+              <option value="linear_quadratic">linear_quadratic</option>
+              <option value="kl_optimal">kl_optimal</option>
+            </select>
+          </div>
+          <div data-u-type="div" data-u-name="DenoiseGroup" data-u-layout="v" data-u-gap="7" style="width: 192px; height: 69px; background-color: transparent;">
+            <span data-u-type="text" data-u-name="DenoiseLabelText" style="height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">降噪强度</span>
+            <input data-u-type="input" data-u-name="DenoiseInput" value="1.0" style="height: 44px; background-color: #f5f5f7; border: 1px solid #d2d2d7; color: #1d1d1f; font-size: 14px; border-radius: 10px;" />
+          </div>
+        </div>
+
+        <div data-u-type="div" data-u-name="PublishActionRow" data-u-layout="h" data-u-gap="16" style="height: 52px; background-color: transparent;">
+          <button data-u-type="button" data-u-name="PublishTaskButton" style="width: 738px; height: 52px; background-color: #0071e3; color: #ffffff; font-size: 16px; font-weight: 500; border: none; border-radius: 12px;">发布绘图任务</button>
+          <button data-u-type="button" data-u-name="RefreshWorkflowButton" style="width: 180px; height: 52px; background-color: #e8e8ed; color: #1d1d1f; font-size: 15px; border: none; border-radius: 12px;">刷新工作流列表</button>
+        </div>
+        <span data-u-type="text" data-u-name="TaskIdText" style="height: 18px; color: #4a4a4f; font-size: 13px; word-break: break-all;">任务 ID: 尚未发布任务</span>
+      </div>
+
+      <div data-u-type="div" data-u-name="RealtimeProgressBox" data-u-layout="v" data-u-pad="24" data-u-gap="14" style="height: 325px; background-color: #ffffff; border: 1px solid #e5e5ea; border-radius: 18px;">
+        <div data-u-type="div" data-u-name="ProgressHeader" data-u-layout="h" style="height: 30px; background-color: transparent;">
+          <span data-u-type="text" data-u-name="ProgressTitleText" style="width: 700px; height: 30px; color: #1d1d1f; font-size: 20px; font-weight: 600;">实时进度消息 (WebSocket)</span>
+          <div data-u-type="div" data-u-name="ProgressHeaderSpacer" style="width: 154px; height: 30px; background-color: transparent;"></div>
+          <button data-u-type="button" data-u-name="ClearMessagesButton" style="width: 80px; height: 30px; background-color: #e8e8ed; color: #1d1d1f; font-size: 13px; border: none; border-radius: 15px;">清空消息</button>
+        </div>
+        <span data-u-type="text" data-u-name="ProgressStatusText" style="height: 20px; color: #1d1d1f; font-size: 15px; font-weight: 500;">当前节点: - | 进度: 0 / 0</span>
+        <div data-u-type="slider" data-u-name="ProgressSlider" data-u-value="0" style="height: 8px; background-color: #0071e3; color: #0071e3; border-radius: 4px;"></div>
+        <div data-u-type="scroll" data-u-name="MessageScroll" data-u-dir="v" data-u-layout="v" data-u-pad="12" data-u-gap="8" style="height: 175px; background-color: #f5f5f7; border: none; border-radius: 12px;">
+          <div data-u-type="div" data-u-name="MessageItemTemplate" data-u-layout="h" data-u-pad="10" data-u-gap="14" style="height: 44px; background-color: #ffffff; border-radius: 9px;">
+            <span data-u-type="text" data-u-name="MessageTimeText" style="width: 84px; height: 24px; color: #4a4a4f; font-size: 12px; font-weight: 600;">00:00:00</span>
+            <span data-u-type="text" data-u-name="MessageTypeText" style="width: 120px; height: 24px; color: #0071e3; font-size: 12px; font-weight: 600;">status</span>
+            <span data-u-type="text" data-u-name="MessageContentText" style="width: 658px; height: 24px; color: #3c3c40; font-size: 13px; word-break: break-all;">等待 WebSocket 消息...</span>
+          </div>
+          <div data-u-type="div" data-u-name="MessageItem" data-u-layout="h" data-u-pad="10" data-u-gap="14" style="height: 44px; background-color: #ffffff; border-radius: 9px;">
+            <span data-u-type="text" data-u-name="MessageItemTimeText" style="width: 84px; height: 24px; color: #4a4a4f; font-size: 12px; font-weight: 600;">00:00:12</span>
+            <span data-u-type="text" data-u-name="MessageItemTypeText" style="width: 120px; height: 24px; color: #0071e3; font-size: 12px; font-weight: 600;">progress</span>
+            <span data-u-type="text" data-u-name="MessageItemContentText" style="width: 658px; height: 24px; color: #3c3c40; font-size: 13px; word-break: break-all;">节点 3 采样 8 / 20</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ---------- 右栏 ---------- -->
+    <div data-u-type="div" data-u-name="RightPanel" data-u-layout="v" data-u-gap="24" style="width: 460px; height: 956px; background-color: transparent;">
+
+      <div data-u-type="div" data-u-name="PreviewBox" data-u-layout="v" data-u-pad="24" data-u-gap="14" style="height: 408px; background-color: #ffffff; border: 1px solid #e5e5ea; border-radius: 18px;">
+        <div data-u-type="div" data-u-name="PreviewHeader" data-u-layout="h" style="height: 30px; background-color: transparent;">
+          <span data-u-type="text" data-u-name="PreviewTitleText" style="width: 250px; height: 30px; color: #1d1d1f; font-size: 20px; font-weight: 600;">图片预览</span>
+          <div data-u-type="div" data-u-name="PreviewHeaderSpacer" style="width: 80px; height: 30px; background-color: transparent;"></div>
+          <button data-u-type="button" data-u-name="RefreshPreviewButton" style="width: 80px; height: 30px; background-color: #0071e3; color: #ffffff; font-size: 13px; border: none; border-radius: 15px;">刷新预览</button>
+        </div>
+        <div data-u-type="image" data-u-name="ResultPreviewImage" style="height: 282px; background-color: #f5f5f7; background-image: none; background-repeat: no-repeat; background-position: center; background-size: contain; border-radius: 12px;"></div>
+        <span data-u-type="text" data-u-name="PreviewInfoText" style="height: 18px; color: #4a4a4f; font-size: 13px; word-break: break-all;">预览信息: 暂无图像</span>
+      </div>
+
+      <div data-u-type="div" data-u-name="HistoryBox" data-u-layout="v" data-u-pad="24" data-u-gap="14" style="height: 290px; background-color: #ffffff; border: 1px solid #e5e5ea; border-radius: 18px;">
+        <div data-u-type="div" data-u-name="HistoryHeader" data-u-layout="h" style="height: 30px; background-color: transparent;">
+          <span data-u-type="text" data-u-name="HistoryTitleText" style="width: 250px; height: 30px; color: #1d1d1f; font-size: 20px; font-weight: 600;">历史任务数据</span>
+          <div data-u-type="div" data-u-name="HistoryHeaderSpacer" style="width: 100px; height: 30px; background-color: transparent;"></div>
+          <button data-u-type="button" data-u-name="RefreshHistoryButton" style="width: 60px; height: 30px; background-color: #0071e3; color: #ffffff; font-size: 13px; border: none; border-radius: 15px;">刷新</button>
+        </div>
+        <div data-u-type="div" data-u-name="HistoryQueryRow" data-u-layout="h" data-u-gap="12" style="height: 42px; background-color: transparent;">
+          <input data-u-type="input" data-u-name="TaskIdInput" placeholder="输入任务 ID 查询" style="width: 258px; height: 42px; background-color: #f5f5f7; border: 1px solid #d2d2d7; color: #1d1d1f; font-size: 14px; border-radius: 10px;" />
+          <button data-u-type="button" data-u-name="QueryTaskButton" style="width: 140px; height: 42px; background-color: #0071e3; color: #ffffff; font-size: 14px; border: none; border-radius: 10px;">按 ID 查询</button>
+        </div>
+        <div data-u-type="scroll" data-u-name="HistoryScroll" data-u-dir="v" data-u-layout="v" data-u-pad="10" data-u-gap="8" style="height: 140px; background-color: #f5f5f7; border: none; border-radius: 12px;">
+          <div data-u-type="div" data-u-name="HistoryItemTemplate" data-u-layout="h" data-u-pad="11" style="height: 48px; background-color: #ffffff; border-radius: 9px;">
+            <span data-u-type="text" data-u-name="HistoryTemplateIdText" style="width: 270px; height: 26px; color: #1d1d1f; font-size: 13px; font-family: monospace;">18897793-2ac9-4ede</span>
+            <div data-u-type="div" data-u-name="HistoryTemplateSpacer" style="width: 18px; height: 26px; background-color: transparent;"></div>
+            <span data-u-type="text" data-u-name="HistoryTemplateStatusText" style="width: 80px; height: 26px; color: #34c759; font-size: 13px; font-weight: 600;">已完成</span>
+          </div>
+          <div data-u-type="div" data-u-name="HistoryItem" data-u-layout="h" data-u-pad="11" style="height: 48px; background-color: #ffffff; border-radius: 9px;">
+            <span data-u-type="text" data-u-name="HistoryItemIdText" style="width: 270px; height: 26px; color: #1d1d1f; font-size: 13px; font-family: monospace;">db82f015-73bd-4c85</span>
+            <div data-u-type="div" data-u-name="HistoryItemSpacer" style="width: 18px; height: 26px; background-color: transparent;"></div>
+            <span data-u-type="text" data-u-name="HistoryItemStatusText" style="width: 80px; height: 26px; color: #ff9500; font-size: 13px; font-weight: 600;">执行中</span>
+          </div>
+        </div>
+      </div>
+
+      <div data-u-type="div" data-u-name="QueueBox" data-u-layout="v" data-u-pad="24" data-u-gap="14" style="height: 210px; background-color: #ffffff; border: 1px solid #e5e5ea; border-radius: 18px;">
+        <div data-u-type="div" data-u-name="QueueHeader" data-u-layout="h" style="height: 30px; background-color: transparent;">
+          <span data-u-type="text" data-u-name="QueueTitleText" style="width: 250px; height: 30px; color: #1d1d1f; font-size: 20px; font-weight: 600;">队列信息</span>
+          <div data-u-type="div" data-u-name="QueueHeaderSpacer" style="width: 80px; height: 30px; background-color: transparent;"></div>
+          <button data-u-type="button" data-u-name="RefreshQueueButton" style="width: 80px; height: 30px; background-color: #0071e3; color: #ffffff; font-size: 13px; border: none; border-radius: 15px;">刷新队列</button>
+        </div>
+        <div data-u-type="div" data-u-name="QueueSummaryRow" data-u-layout="h" data-u-gap="4" style="height: 18px; background-color: transparent;">
+          <span data-u-type="text" data-u-name="QueueRunningLabelText" style="width: 62px; height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">运行中:</span>
+          <span data-u-type="text" data-u-name="QueueRunningValueText" style="width: 12px; height: 18px; color: #34c759; font-size: 13px; font-weight: 600;">0</span>
+          <span data-u-type="text" data-u-name="QueuePendingLabelText" style="width: 92px; height: 18px; color: #3c3c40; font-size: 13px; font-weight: 600;">| 等待中:</span>
+          <span data-u-type="text" data-u-name="QueuePendingValueText" style="width: 12px; height: 18px; color: #ff9500; font-size: 13px; font-weight: 600;">0</span>
+        </div>
+        <div data-u-type="scroll" data-u-name="QueueScroll" data-u-dir="v" data-u-layout="v" data-u-pad="10" data-u-gap="8" style="height: 84px; background-color: #f5f5f7; border: none; border-radius: 12px;">
+          <div data-u-type="div" data-u-name="QueueItemTemplate" data-u-layout="h" data-u-pad="8" style="height: 36px; background-color: #ffffff; border-radius: 9px;">
+            <span data-u-type="text" data-u-name="QueueTemplateIdText" style="width: 260px; height: 20px; color: #1d1d1f; font-size: 13px; font-family: monospace;">#1 3b7d83a5-1fa5</span>
+            <div data-u-type="div" data-u-name="QueueTemplateSpacer" style="width: 34px; height: 20px; background-color: transparent;"></div>
+            <span data-u-type="text" data-u-name="QueueTemplateStateText" style="width: 80px; height: 20px; color: #ff9500; font-size: 13px; font-weight: 600;">等待中</span>
+          </div>
+          <div data-u-type="div" data-u-name="QueueItem" data-u-layout="h" data-u-pad="8" style="height: 36px; background-color: #ffffff; border-radius: 9px;">
+            <span data-u-type="text" data-u-name="QueueItemIdText" style="width: 260px; height: 20px; color: #1d1d1f; font-size: 13px; font-family: monospace;">#2 dcd4f302-b867</span>
+            <div data-u-type="div" data-u-name="QueueItemSpacer" style="width: 34px; height: 20px; background-color: transparent;"></div>
+            <span data-u-type="text" data-u-name="QueueItemStateText" style="width: 80px; height: 20px; color: #34c759; font-size: 13px; font-weight: 600;">运行中</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<!-- ▲▲▲ 界面本体结束 ▲▲▲ -->
+
+</div>
+
+<!-- 预览视觉补丁：纯浏览器样式，不含 data-u-type，Unity 端完全忽略，不参与 UI-DSL 解析 -->
+<style>
+    html, body { background: #f5f5f7; }
+    input[data-u-type="input"]::placeholder { color: #6e6e73; opacity: 1; }
+    [data-u-type="scroll"]::before { display: none; }
+    [data-u-type="button"] { transition: opacity .15s; }
+    [data-u-type="button"]:hover { opacity: .82; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #d2d2d7; border-radius: 3px; }
+</style>
+
+<script>
+(function () {
+    var stage = document.getElementById('u-stage');
+
+    // data-u-gap / data-u-pad 在 Unity 端由 C# 求解，在浏览器端翻译成真正的 CSS
+    var boxes = stage.querySelectorAll('[data-u-gap],[data-u-pad]');
+    for (var i = 0; i !== boxes.length; i++) {
+        var g = boxes[i].getAttribute('data-u-gap');
+        var p = boxes[i].getAttribute('data-u-pad');
+        if (g) boxes[i].style.gap = g + 'px';
+        if (p) boxes[i].style.padding = p + 'px';
+    }
+
+    // 文本节点去首尾空白，与 Unity 端 Trim 行为一致
+    var texts = stage.querySelectorAll('[data-u-type="text"]');
+    for (var j = 0; j !== texts.length; j++) {
+        texts[j].textContent = texts[j].textContent.replace(/^[\s\uFEFF]+|[\s\uFEFF]+$/g, '');
+    }
+
+    // 滑动条进度
+    var sliders = stage.querySelectorAll('[data-u-type="slider"]');
+    for (var k = 0; k !== sliders.length; k++) {
+        var v = parseFloat(sliders[k].getAttribute('data-u-value'));
+        if (isNaN(v)) v = 0.5;
+        if (v > 1) v = v / 100;
+        v = Math.max(0, Math.min(1, v));
+        sliders[k].style.setProperty('--u-val', (v * 100) + '%');
+    }
+
+})();
+</script>
+
+</body>
+</html>
